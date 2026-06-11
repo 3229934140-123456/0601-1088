@@ -87,6 +87,8 @@ export class CompensationRecordsService {
         assetId: returnRecord.borrowRecord?.assetId,
         amount,
       },
+      relatedEntityType: 'CompensationRecord',
+      relatedEntityId: saved.id,
     });
 
     return this.findOne(saved.id);
@@ -136,7 +138,10 @@ export class CompensationRecordsService {
         'returnRecord',
         'returnRecord.borrowRecord',
         'returnRecord.borrowRecord.asset',
+        'returnRecord.borrowRecord.asset.category',
+        'returnRecord.borrowRecord.asset.location',
         'returnRecord.borrowRecord.borrower',
+        'returnRecord.borrowRecord.borrower.department',
         'handler',
       ],
     });
@@ -144,6 +149,18 @@ export class CompensationRecordsService {
       throw new NotFoundException('赔偿记录不存在');
     }
     return compensation;
+  }
+
+  async findByReturnRecordId(returnRecordId: number): Promise<CompensationRecord | null> {
+    return this.compensationRecordsRepository.findOne({
+      where: { returnRecordId },
+      relations: [
+        'returnRecord',
+        'returnRecord.borrowRecord',
+        'returnRecord.borrowRecord.asset',
+        'handler',
+      ],
+    });
   }
 
   async update(
@@ -184,6 +201,22 @@ export class CompensationRecordsService {
         beforeData,
         afterData: saved,
       });
+
+      const borrowerId = compensation.returnRecord?.borrowRecord?.borrowerId || 0;
+      if (borrowerId) {
+        await this.notificationsService.create({
+          userId: borrowerId,
+          type: NotificationType.SYSTEM_NOTICE,
+          title: '赔偿已支付',
+          content: `您的赔偿 ${saved.compensationNo}（¥${saved.amount}）已确认支付`,
+          relatedData: {
+            compensationRecordId: id,
+            status: CompensationStatus.PAID,
+          },
+          relatedEntityType: 'CompensationRecord',
+          relatedEntityId: id,
+        });
+      }
     } else {
       await this.auditLogService.create({
         userId: operatorId,
@@ -228,10 +261,13 @@ export class CompensationRecordsService {
       userId: compensation.returnRecord?.borrowRecord?.borrowerId || 0,
       type: NotificationType.SYSTEM_NOTICE,
       title: '赔偿已免除',
-      content: `您的赔偿 ${saved.compensationNo} 已被免除`,
+      content: `您的赔偿 ${saved.compensationNo}（¥${saved.amount}）已被免除`,
       relatedData: {
         compensationRecordId: id,
+        status: CompensationStatus.WAIVED,
       },
+      relatedEntityType: 'CompensationRecord',
+      relatedEntityId: id,
     });
 
     return saved;

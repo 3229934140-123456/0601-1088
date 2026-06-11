@@ -137,9 +137,13 @@ export class ReturnRecordsService {
       relations: [
         'borrowRecord',
         'borrowRecord.asset',
+        'borrowRecord.asset.category',
+        'borrowRecord.asset.location',
         'borrowRecord.borrower',
+        'borrowRecord.borrower.department',
         'confirmer',
         'compensationRecord',
+        'compensationRecord.handler',
       ],
     });
     if (!returnRecord) {
@@ -154,8 +158,12 @@ export class ReturnRecordsService {
       relations: [
         'borrowRecord',
         'borrowRecord.asset',
+        'borrowRecord.asset.category',
+        'borrowRecord.asset.location',
         'borrowRecord.borrower',
+        'borrowRecord.borrower.department',
         'compensationRecord',
+        'compensationRecord.handler',
       ],
     });
   }
@@ -241,6 +249,8 @@ export class ReturnRecordsService {
             hasDamage: true,
             assetStatus: AssetStatus.UNDER_REPAIR,
           },
+          relatedEntityType: 'ReturnRecord',
+          relatedEntityId: id,
         });
       }
     }

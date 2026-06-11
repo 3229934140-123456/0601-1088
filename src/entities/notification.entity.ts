@@ -11,6 +11,7 @@ import { IsString, IsOptional, IsEnum, IsNumber } from 'class-validator';
 @Index('idx_is_read', ['isRead'])
 @Index('idx_created_at', ['createdAt'])
 @Index('idx_dedup_key', ['dedupKey'], { unique: true })
+@Index('idx_related_entity', ['relatedEntityType', 'relatedEntityId'])
 export class Notification extends BaseEntity {
   @Column({ type: 'bigint', comment: '接收用户ID' })
   @ApiProperty({ description: '接收用户ID' })
@@ -39,6 +40,14 @@ export class Notification extends BaseEntity {
   @Column({ type: 'json', nullable: true, comment: '相关数据' })
   @ApiProperty({ description: '相关数据', required: false })
   relatedData?: any;
+
+  @Column({ type: 'varchar', length: 50, nullable: true, comment: '关联实体类型（如BorrowRecord/ReturnRecord/CompensationRecord）' })
+  @ApiProperty({ description: '关联实体类型', required: false })
+  relatedEntityType?: string;
+
+  @Column({ type: 'bigint', nullable: true, comment: '关联实体ID' })
+  @ApiProperty({ description: '关联实体ID', required: false })
+  relatedEntityId?: number;
 
   @Column({ type: 'boolean', default: false, comment: '是否已读' })
   @ApiProperty({ description: '是否已读', default: false })
@@ -72,6 +81,14 @@ export class CreateNotificationDto {
   @IsOptional()
   @IsString()
   dedupKey?: string;
+
+  @IsOptional()
+  @IsString()
+  relatedEntityType?: string;
+
+  @IsOptional()
+  @IsNumber()
+  relatedEntityId?: number;
 }
 
 export class QueryNotificationDto {
@@ -81,6 +98,14 @@ export class QueryNotificationDto {
 
   @IsOptional()
   isRead?: boolean;
+
+  @IsOptional()
+  @IsString()
+  relatedEntityType?: string;
+
+  @IsOptional()
+  @IsNumber()
+  relatedEntityId?: number;
 
   @IsOptional()
   page?: number = 1;

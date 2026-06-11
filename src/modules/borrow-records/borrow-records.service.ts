@@ -73,7 +73,7 @@ export class BorrowRecordsService {
     const existingBorrow = await this.borrowRecordsRepository.findOne({
       where: {
         assetId,
-        status: In([BorrowStatus.PENDING, BorrowStatus.BORROWED, BorrowStatus.OVERDUE]),
+        status: In([BorrowStatus.PENDING, BorrowStatus.APPROVED, BorrowStatus.BORROWED, BorrowStatus.OVERDUE]),
       },
     });
     if (existingBorrow) {
@@ -113,6 +113,8 @@ export class BorrowRecordsService {
       title: '领用申请已提交',
       content: `您的 ${asset.name} 领用申请已提交，等待审批`,
       relatedData: { borrowRecordId: saved.id, assetId },
+      relatedEntityType: 'BorrowRecord',
+      relatedEntityId: saved.id,
     });
 
     return this.findOne(saved.id);
@@ -197,6 +199,7 @@ export class BorrowRecordsService {
         'borrower',
         'borrower.department',
         'returnRecord',
+        'returnRecord.compensationRecord',
       ],
     });
     if (!record) {
@@ -227,16 +230,10 @@ export class BorrowRecordsService {
     const beforeData = { ...record };
 
     if (approveDto.status === BorrowStatus.APPROVED) {
-      record.status = BorrowStatus.BORROWED;
+      record.status = BorrowStatus.APPROVED;
       record.approverId = operatorId;
       record.approvedAt = new Date();
       record.approvalRemark = approveDto.remark;
-
-      const asset = await this.assetsRepository.findOne({ where: { id: record.assetId } });
-      if (asset) {
-        asset.status = AssetStatus.BORROWED;
-        await this.assetsRepository.save(asset);
-      }
 
       await this.notificationsService.create({
         userId: record.borrowerId,
@@ -244,12 +241,14 @@ export class BorrowRecordsService {
         title: '领用申请已通过',
         content: `您的 ${record.asset?.name} 领用申请已通过审批，请及时领取`,
         relatedData: { borrowRecordId: id, assetId: record.assetId },
+        relatedEntityType: 'BorrowRecord',
+        relatedEntityId: id,
       });
 
       await this.auditLogService.create({
         userId: operatorId,
         action: AuditAction.BORROW_APPROVE,
-        description: `审批通过领用: ${record.asset?.name}`,
+        description: `审批通过领用: ${record.asset?.name}（等待领取确认）`,
         entityType: 'BorrowRecord',
         entityId: id,
         beforeData,
@@ -267,6 +266,8 @@ export class BorrowRecordsService {
         title: '领用申请被拒绝',
         content: `您的 ${record.asset?.name} 领用申请被拒绝，原因：${approveDto.remark || '未说明'}`,
         relatedData: { borrowRecordId: id, assetId: record.assetId },
+        relatedEntityType: 'BorrowRecord',
+        relatedEntityId: id,
       });
 
       await this.auditLogService.create({
@@ -281,6 +282,41 @@ export class BorrowRecordsService {
     } else {
       throw new BadRequestException('无效的审批状态');
     }
+
+    return this.borrowRecordsRepository.save(record);
+  }
+
+  async claim(id: number, operatorId: number): Promise<BorrowRecord> {
+    const record = await this.findOne(id);
+    if (!record) {
+      throw new NotFoundException('领用记录不存在');
+    }
+
+    if (record.status !== BorrowStatus.APPROVED) {
+      throw new ConflictException('只有审批通过的申请才能确认领取');
+    }
+
+    const beforeData = { ...record };
+
+    record.status = BorrowStatus.BORROWED;
+    record.claimedById = operatorId;
+    record.claimedAt = new Date();
+
+    const asset = await this.assetsRepository.findOne({ where: { id: record.assetId } });
+    if (asset) {
+      asset.status = AssetStatus.BORROWED;
+      await this.assetsRepository.save(asset);
+    }
+
+    await this.auditLogService.create({
+      userId: operatorId,
+      action: AuditAction.BORROW_CLAIM,
+      description: `确认领取资产: ${record.asset?.name}（操作人: ${operatorId === record.borrowerId ? '领用人本人' : '门禁柜/管理员'}）`,
+      entityType: 'BorrowRecord',
+      entityId: id,
+      beforeData,
+      afterData: record,
+    });
 
     return this.borrowRecordsRepository.save(record);
   }

@@ -25,10 +25,48 @@ export class NotificationsController {
     return this.notificationsService.getUnreadCount(userId);
   }
 
+  @Get('unprocessed')
+  @ApiOperation({ summary: '只看未处理事项（超期+赔偿）' })
+  findUnprocessed(
+    @GetCurrentUserId() userId: number,
+    @Query() query: { page?: number; pageSize?: number },
+  ) {
+    return this.notificationsService.findUnprocessed(userId, query);
+  }
+
+  @Get('entity/:entityType/:entityId')
+  @ApiOperation({ summary: '按业务单聚合查看提醒历史' })
+  findByEntity(
+    @GetCurrentUserId() userId: number,
+    @Param('entityType') entityType: string,
+    @Param('entityId') entityId: string,
+  ) {
+    return this.notificationsService.findByEntity(userId, entityType, +entityId);
+  }
+
   @Patch('read-all')
   @ApiOperation({ summary: '全部标记已读' })
   markAllAsRead(@GetCurrentUserId() userId: number) {
     return this.notificationsService.markAllAsRead(userId);
+  }
+
+  @Patch('batch-read')
+  @ApiOperation({ summary: '批量标记已读' })
+  batchMarkAsRead(
+    @GetCurrentUserId() userId: number,
+    @Body() body: { ids: number[] },
+  ) {
+    return this.notificationsService.batchMarkAsRead(userId, body.ids);
+  }
+
+  @Patch('entity-read/:entityType/:entityId')
+  @ApiOperation({ summary: '按业务单标记所有通知已读' })
+  markEntityRead(
+    @GetCurrentUserId() userId: number,
+    @Param('entityType') entityType: string,
+    @Param('entityId') entityId: string,
+  ) {
+    return this.notificationsService.markEntityRead(userId, entityType, +entityId);
   }
 
   @Get(':id')

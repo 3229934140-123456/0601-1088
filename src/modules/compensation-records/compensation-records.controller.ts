@@ -58,6 +58,12 @@ export class CompensationRecordsController {
     return this.compensationRecordsService.findOne(+id);
   }
 
+  @Get('return-record/:returnRecordId')
+  @ApiOperation({ summary: '根据归还记录查询赔偿信息' })
+  findByReturnRecordId(@Param('returnRecordId') returnRecordId: string) {
+    return this.compensationRecordsService.findByReturnRecordId(+returnRecordId);
+  }
+
   @Patch(':id')
   @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: '更新赔偿记录（管理员）' })

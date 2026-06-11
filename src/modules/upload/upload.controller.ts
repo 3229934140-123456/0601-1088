@@ -41,12 +41,14 @@ export class UploadController {
     return dir;
   }
 
-  private buildFileUrl(file: Express.Multer.File): string {
+  private buildFileUrl(file: Express.Multer.File): { url: string; fullPath: string } {
     const relativePath = path.relative(
       path.join(process.cwd(), this.uploadDir),
       file.path,
     ).replace(/\\/g, '/');
-    return `/uploads/${relativePath}`;
+    const url = `/uploads/${relativePath}`;
+    const fullPath = this.baseUrl ? `${this.baseUrl}${url}` : url;
+    return { url, fullPath };
   }
 
   @Post('file')
@@ -68,10 +70,9 @@ export class UploadController {
       storage: diskStorage({
         destination: (req, file, cb) => {
           const category = (req.query.category as string) || 'general';
-          const dir = (req as any).uploadDir || `./uploads/${category}`;
-          const absDir = path.resolve(process.cwd(), dir, 
-            `${new Date().getFullYear()}${(new Date().getMonth() + 1).toString().padStart(2, '0')}${new Date().getDate().toString().padStart(2, '0')}`
-          );
+          const date = new Date();
+          const dateStr = `${date.getFullYear()}${(date.getMonth() + 1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}`;
+          const absDir = path.resolve(process.cwd(), './uploads', category, dateStr);
           if (!fs.existsSync(absDir)) {
             fs.mkdirSync(absDir, { recursive: true });
           }
@@ -109,14 +110,14 @@ export class UploadController {
       throw new BadRequestException('请选择要上传的文件');
     }
 
-    const url = this.buildFileUrl(file);
+    const { url, fullPath } = this.buildFileUrl(file);
     return {
       originalName: file.originalname,
       filename: file.filename,
       size: file.size,
       mimetype: file.mimetype,
       url,
-      path: url,
+      fullPath,
       category,
       uploadedAt: new Date().toISOString(),
     };
@@ -185,14 +186,14 @@ export class UploadController {
     }
 
     return files.map((file) => {
-      const url = this.buildFileUrl(file);
+      const { url, fullPath } = this.buildFileUrl(file);
       return {
         originalName: file.originalname,
         filename: file.filename,
         size: file.size,
         mimetype: file.mimetype,
         url,
-        path: url,
+        fullPath,
         category,
         uploadedAt: new Date().toISOString(),
       };

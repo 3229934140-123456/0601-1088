@@ -79,6 +79,14 @@ export class BorrowRecord extends BaseEntity {
   @ApiProperty({ description: '审批意见', required: false })
   approvalRemark?: string;
 
+  @Column({ type: 'bigint', nullable: true, comment: '领取确认人ID' })
+  @ApiProperty({ description: '领取确认人ID', required: false })
+  claimedById?: number;
+
+  @Column({ type: 'datetime', nullable: true, comment: '领取确认时间' })
+  @ApiProperty({ description: '领取确认时间', required: false })
+  claimedAt?: Date;
+
   @Column({ type: 'json', nullable: true, comment: '附件凭证列表' })
   @ApiProperty({ description: '附件凭证列表', type: [String], required: false })
   attachments?: string[];

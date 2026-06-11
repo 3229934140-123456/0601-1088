@@ -55,6 +55,7 @@ export enum AuditAction {
   BORROW_REQUEST = 'borrow_request',
   BORROW_APPROVE = 'borrow_approve',
   BORROW_REJECT = 'borrow_reject',
+  BORROW_CLAIM = 'borrow_claim',
   RETURN_SUBMIT = 'return_submit',
   RETURN_CONFIRM = 'return_confirm',
   DAMAGE_REPORT = 'damage_report',

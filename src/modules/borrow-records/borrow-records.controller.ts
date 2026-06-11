@@ -79,6 +79,12 @@ export class BorrowRecordsController {
     return this.borrowRecordsService.cancel(+id, operatorId);
   }
 
+  @Patch(':id/claim')
+  @ApiOperation({ summary: '确认领取资产（员工/门禁柜回调）' })
+  claim(@Param('id') id: string, @GetCurrentUserId() operatorId: number) {
+    return this.borrowRecordsService.claim(+id, operatorId);
+  }
+
   @Post('batch-approve')
   @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: '批量审批领用申请（管理员）' })
