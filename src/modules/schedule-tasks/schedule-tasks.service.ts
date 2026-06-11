@@ -26,22 +26,33 @@ export class ScheduleTasksService {
       const overdueRecords = await this.borrowRecordsService.getOverdueRecords();
       this.logger.log(`发现 ${overdueRecords.length} 条超期记录`);
 
+      const today = new Date().toISOString().split('T')[0];
       for (const record of overdueRecords) {
         if (record.status === BorrowStatus.BORROWED) {
           await this.borrowRecordsService.markAsOverdue(record.id);
         }
 
-        await this.notificationsService.create({
-          userId: record.borrowerId,
-          type: NotificationType.OVERDUE_WARNING,
-          title: '资产超期提醒',
-          content: `您领用的 ${record.asset?.name} 已超期，请尽快归还。超期天数：${Math.abs(record.daysRemaining)} 天`,
-          relatedData: {
-            borrowRecordId: record.id,
-            assetId: record.assetId,
-            overdueDays: Math.abs(record.daysRemaining),
+        const overdueDays = record.overdueDays || Math.abs(record.daysRemaining || 0);
+        await this.notificationsService.createUnique(
+          {
+            userId: record.borrowerId,
+            type: NotificationType.OVERDUE_WARNING,
+            title: '资产超期提醒',
+            content: `您领用的 ${record.asset?.name} 已超期 ${overdueDays} 天，请尽快归还`,
+            relatedData: {
+              borrowRecordId: record.id,
+              assetId: record.assetId,
+              overdueDays,
+            },
           },
-        });
+          {
+            userId: record.borrowerId,
+            type: NotificationType.OVERDUE_WARNING,
+            entityType: 'BorrowRecord',
+            entityId: record.id,
+            dateKey: today,
+          },
+        );
       }
 
       this.logger.log('超期检测任务执行完成');
@@ -62,20 +73,30 @@ export class ScheduleTasksService {
       const expiringRecords = await this.borrowRecordsService.getExpiringRecords(notifyDays);
       this.logger.log(`发现 ${expiringRecords.length} 条即将到期记录`);
 
+      const today = new Date().toISOString().split('T')[0];
       for (const record of expiringRecords) {
         const daysRemaining = record.daysRemaining;
         if (daysRemaining > 0) {
-          await this.notificationsService.create({
-            userId: record.borrowerId,
-            type: NotificationType.RETURN_REMINDER,
-            title: '资产到期提醒',
-            content: `您领用的 ${record.asset?.name} 将在 ${daysRemaining} 天后到期，请按时归还`,
-            relatedData: {
-              borrowRecordId: record.id,
-              assetId: record.assetId,
-              daysRemaining,
+          await this.notificationsService.createUnique(
+            {
+              userId: record.borrowerId,
+              type: NotificationType.RETURN_REMINDER,
+              title: '资产到期提醒',
+              content: `您领用的 ${record.asset?.name} 将在 ${daysRemaining} 天后到期，请按时归还`,
+              relatedData: {
+                borrowRecordId: record.id,
+                assetId: record.assetId,
+                daysRemaining,
+              },
             },
-          });
+            {
+              userId: record.borrowerId,
+              type: NotificationType.RETURN_REMINDER,
+              entityType: 'BorrowRecord',
+              entityId: record.id,
+              dateKey: today,
+            },
+          );
         }
       }
 

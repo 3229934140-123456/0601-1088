@@ -179,17 +179,22 @@ export class ReturnRecordsService {
     const asset = borrowRecord?.asset;
     const assetId = asset?.id as number;
     const assetName = asset?.name || '';
+    const borrowerId = borrowRecord?.borrowerId || 0;
+
+    const finalHasDamage = confirmDto.hasDamage ?? returnRecord.hasDamage;
+    const isConfirmed = confirmDto.status === ReturnStatus.CONFIRMED || 
+                         confirmDto.status === ReturnStatus.DAMAGED;
 
     Object.assign(returnRecord, {
       status: confirmDto.status,
-      hasDamage: confirmDto.hasDamage ?? returnRecord.hasDamage,
+      hasDamage: finalHasDamage,
       damageDescription: confirmDto.damageDescription ?? returnRecord.damageDescription,
       damagePhotos: confirmDto.damagePhotos ?? returnRecord.damagePhotos,
       remark: confirmDto.remark ?? returnRecord.remark,
       confirmerId: operatorId,
     });
 
-    if (confirmDto.status === ReturnStatus.CONFIRMED) {
+    if (isConfirmed) {
       if (borrowRecord) {
         borrowRecord.status = BorrowStatus.RETURNED;
         borrowRecord.actualReturnDate = returnRecord.returnDate;
@@ -197,8 +202,8 @@ export class ReturnRecordsService {
       }
 
       if (asset) {
-        if (returnRecord.hasDamage) {
-          asset.status = AssetStatus.DAMAGED;
+        if (finalHasDamage) {
+          asset.status = AssetStatus.UNDER_REPAIR;
         } else {
           asset.status = AssetStatus.AVAILABLE;
         }
@@ -208,49 +213,36 @@ export class ReturnRecordsService {
       await this.auditLogService.create({
         userId: operatorId,
         action: AuditAction.RETURN_CONFIRM,
-        description: `确认归还: ${assetName}`,
+        description: `确认归还: ${assetName}${finalHasDamage ? '（有损坏，转入待维修）' : ''}`,
         entityType: 'ReturnRecord',
         entityId: id,
         beforeData,
         afterData: returnRecord,
       });
 
-      if (returnRecord.hasDamage) {
+      if (finalHasDamage) {
         await this.auditLogService.create({
           userId: operatorId,
           action: AuditAction.DAMAGE_REPORT,
           description: `登记损坏: ${assetName}, ${returnRecord.damageDescription}`,
           entityType: 'Asset',
           entityId: assetId,
-          afterData: { damage: returnRecord.damageDescription },
+          afterData: { damage: returnRecord.damageDescription, status: AssetStatus.UNDER_REPAIR },
         });
 
         await this.notificationsService.create({
-          userId: borrowRecord?.borrowerId || 0,
+          userId: borrowerId,
           type: NotificationType.COMPENSATION_REQUEST,
           title: '资产损坏提醒',
-          content: `您归还的 ${assetName} 存在损坏：${returnRecord.damageDescription}，请配合处理赔偿事宜`,
+          content: `您归还的 ${assetName} 存在损坏：${returnRecord.damageDescription}，资产已转入待维修状态，请配合处理赔偿事宜`,
           relatedData: {
             returnRecordId: id,
             assetId: assetId,
             hasDamage: true,
+            assetStatus: AssetStatus.UNDER_REPAIR,
           },
         });
       }
-    } else if (confirmDto.status === ReturnStatus.DAMAGED) {
-      if (asset) {
-        asset.status = AssetStatus.DAMAGED;
-        await this.assetsRepository.save(asset);
-      }
-
-      await this.auditLogService.create({
-        userId: operatorId,
-        action: AuditAction.DAMAGE_REPORT,
-        description: `登记损坏: ${assetName}, ${returnRecord.damageDescription}`,
-        entityType: 'Asset',
-        entityId: assetId,
-        afterData: returnRecord,
-      });
     }
 
     return this.returnRecordsRepository.save(returnRecord);

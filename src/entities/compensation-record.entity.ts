@@ -17,6 +17,7 @@ import {
   IsNumber,
   IsEnum,
   IsDate,
+  IsArray,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -71,6 +72,10 @@ export class CompensationRecord extends BaseEntity {
   @ApiProperty({ description: '备注', required: false })
   remark?: string;
 
+  @Column({ type: 'json', nullable: true, comment: '赔偿凭证附件列表' })
+  @ApiProperty({ description: '赔偿凭证附件列表', type: [String], required: false })
+  attachments?: string[];
+
   @OneToOne(() => ReturnRecord, (returnRecord) => returnRecord.compensationRecord)
   @JoinColumn({ name: 'returnRecordId' })
   returnRecord: ReturnRecord;
@@ -89,6 +94,11 @@ export class CreateCompensationRecordDto {
 
   @IsString()
   description: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  attachments?: string[];
 
   @IsOptional()
   @IsString()
@@ -112,6 +122,11 @@ export class UpdateCompensationRecordDto {
   @Type(() => Date)
   @IsDate()
   paidDate?: Date;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  attachments?: string[];
 
   @IsOptional()
   @IsString()

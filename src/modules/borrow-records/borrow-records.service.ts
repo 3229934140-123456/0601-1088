@@ -12,6 +12,7 @@ import {
   CreateBorrowRecordDto,
   ApproveBorrowDto,
   QueryBorrowRecordDto,
+  BatchApproveBorrowDto,
 } from '../../entities/borrow-record.entity';
 import { Asset } from '../../entities/asset.entity';
 import { User } from '../../entities/user.entity';
@@ -124,6 +125,8 @@ export class BorrowRecordsService {
       assetId,
       borrowerId,
       departmentId,
+      categoryId,
+      locationId,
       status,
       startDate,
       endDate,
@@ -149,6 +152,12 @@ export class BorrowRecordsService {
     if (departmentId) {
       qb.andWhere('borrower.departmentId = :departmentId', { departmentId });
     }
+    if (categoryId) {
+      qb.andWhere('asset.categoryId = :categoryId', { categoryId });
+    }
+    if (locationId) {
+      qb.andWhere('asset.locationId = :locationId', { locationId });
+    }
     if (status) qb.andWhere('record.status = :status', { status });
     if (startDate) {
       qb.andWhere('record.borrowDate >= :startDate', { startDate });
@@ -163,15 +172,16 @@ export class BorrowRecordsService {
       .take(pageSize)
       .getManyAndCount();
 
-    let resultList = list.map((record) => ({
+    const resultList = list.map((record) => ({
       ...record,
       isOverdue: record.isOverdue,
       daysRemaining: record.daysRemaining,
+      overdueDays: record.overdueDays,
     }));
 
     if (isOverdue !== undefined) {
-      resultList = resultList.filter((r) => r.isOverdue === isOverdue);
-      return { list: resultList, total: resultList.length, page, pageSize };
+      const filtered = resultList.filter((r) => r.isOverdue === isOverdue);
+      return { list: filtered, total: filtered.length, page, pageSize };
     }
 
     return { list: resultList, total, page, pageSize };
@@ -196,6 +206,7 @@ export class BorrowRecordsService {
       ...record,
       isOverdue: record.isOverdue,
       daysRemaining: record.daysRemaining,
+      overdueDays: record.overdueDays,
     } as BorrowRecord;
   }
 
@@ -349,5 +360,25 @@ export class BorrowRecordsService {
       record.status = BorrowStatus.OVERDUE;
       await this.borrowRecordsRepository.save(record);
     }
+  }
+
+  async batchApprove(
+    batchDto: BatchApproveBorrowDto,
+    operatorId?: number,
+  ): Promise<{ success: number[]; failed: { id: number; reason: string }[] }> {
+    const { ids, status, remark } = batchDto;
+    const success: number[] = [];
+    const failed: { id: number; reason: string }[] = [];
+
+    for (const id of ids) {
+      try {
+        await this.approve(id, { status, remark }, operatorId);
+        success.push(id);
+      } catch (error: any) {
+        failed.push({ id, reason: error.message || '审批失败' });
+      }
+    }
+
+    return { success, failed };
   }
 }

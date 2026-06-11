@@ -15,7 +15,39 @@ export class NotificationsService {
   ) {}
 
   async create(createNotificationDto: CreateNotificationDto): Promise<Notification> {
+    const { dedupKey } = createNotificationDto;
+    
+    if (dedupKey) {
+      const existing = await this.notificationsRepository.findOne({
+        where: { dedupKey, userId: createNotificationDto.userId },
+      });
+      if (existing) {
+        return existing;
+      }
+    }
+
     const notification = this.notificationsRepository.create(createNotificationDto);
+    return this.notificationsRepository.save(notification);
+  }
+
+  async createUnique(
+    createNotificationDto: CreateNotificationDto,
+    dedupParts: { userId: number; type: string; entityType?: string; entityId?: number; dateKey?: string },
+  ): Promise<Notification> {
+    const dateKey = dedupParts.dateKey || new Date().toISOString().split('T')[0];
+    const dedupKey = `${dedupParts.userId}:${dedupParts.type}:${dedupParts.entityType || 'none'}:${dedupParts.entityId || 0}:${dateKey}`;
+    
+    const existing = await this.notificationsRepository.findOne({
+      where: { dedupKey, userId: dedupParts.userId },
+    });
+    if (existing) {
+      return existing;
+    }
+
+    const notification = this.notificationsRepository.create({
+      ...createNotificationDto,
+      dedupKey,
+    });
     return this.notificationsRepository.save(notification);
   }
 

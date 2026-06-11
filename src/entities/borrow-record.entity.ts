@@ -113,6 +113,11 @@ export class BorrowRecord extends BaseEntity {
     const diff = expected.getTime() - today.getTime();
     return Math.ceil(diff / (1000 * 60 * 60 * 24));
   }
+
+  get overdueDays(): number {
+    const remaining = this.daysRemaining;
+    return remaining < 0 ? Math.abs(remaining) : 0;
+  }
 }
 
 export class CreateBorrowRecordDto {
@@ -167,6 +172,14 @@ export class QueryBorrowRecordDto {
   departmentId?: number;
 
   @IsOptional()
+  @IsNumber()
+  categoryId?: number;
+
+  @IsOptional()
+  @IsNumber()
+  locationId?: number;
+
+  @IsOptional()
   @IsEnum(BorrowStatus)
   status?: BorrowStatus;
 
@@ -189,4 +202,16 @@ export class QueryBorrowRecordDto {
 
   @IsOptional()
   pageSize?: number = 20;
+}
+
+export class BatchApproveBorrowDto {
+  @IsNumber({}, { each: true })
+  ids: number[];
+
+  @IsEnum(BorrowStatus)
+  status: BorrowStatus;
+
+  @IsOptional()
+  @IsString()
+  remark?: string;
 }

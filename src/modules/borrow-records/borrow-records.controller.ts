@@ -13,6 +13,7 @@ import {
   CreateBorrowRecordDto,
   ApproveBorrowDto,
   QueryBorrowRecordDto,
+  BatchApproveBorrowDto,
 } from '../../entities/borrow-record.entity';
 import { Roles, GetCurrentUserId, GetCurrentUser } from '../../common/decorators';
 import { UserRole } from '../../common/enums';
@@ -76,5 +77,15 @@ export class BorrowRecordsController {
   @ApiOperation({ summary: '撤销领用申请' })
   cancel(@Param('id') id: string, @GetCurrentUserId() operatorId: number) {
     return this.borrowRecordsService.cancel(+id, operatorId);
+  }
+
+  @Post('batch-approve')
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: '批量审批领用申请（管理员）' })
+  batchApprove(
+    @Body() batchDto: BatchApproveBorrowDto,
+    @GetCurrentUserId() operatorId: number,
+  ) {
+    return this.borrowRecordsService.batchApprove(batchDto, operatorId);
   }
 }

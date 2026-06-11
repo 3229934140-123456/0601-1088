@@ -9,6 +9,7 @@ export enum AssetStatus {
   BORROWED = 'borrowed',
   FROZEN = 'frozen',
   DAMAGED = 'damaged',
+  UNDER_REPAIR = 'under_repair',
   LOST = 'lost',
   SCRAPPED = 'scrapped',
 }

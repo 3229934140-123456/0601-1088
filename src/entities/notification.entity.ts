@@ -10,10 +10,15 @@ import { IsString, IsOptional, IsEnum, IsNumber } from 'class-validator';
 @Index('idx_type', ['type'])
 @Index('idx_is_read', ['isRead'])
 @Index('idx_created_at', ['createdAt'])
+@Index('idx_dedup_key', ['dedupKey'], { unique: true })
 export class Notification extends BaseEntity {
   @Column({ type: 'bigint', comment: '接收用户ID' })
   @ApiProperty({ description: '接收用户ID' })
   userId: number;
+
+  @Column({ type: 'varchar', length: 255, nullable: true, comment: '去重键（用户+类型+关联实体+日期）' })
+  @ApiProperty({ description: '去重键', required: false })
+  dedupKey?: string;
 
   @Column({
     type: 'enum',
@@ -63,6 +68,10 @@ export class CreateNotificationDto {
 
   @IsOptional()
   relatedData?: any;
+
+  @IsOptional()
+  @IsString()
+  dedupKey?: string;
 }
 
 export class QueryNotificationDto {
