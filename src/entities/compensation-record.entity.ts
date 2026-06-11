@@ -132,3 +132,41 @@ export class UpdateCompensationRecordDto {
   @IsString()
   remark?: string;
 }
+
+export class QueryCompensationRecordDto {
+  @IsOptional()
+  @IsEnum(CompensationStatus)
+  status?: CompensationStatus;
+
+  @IsOptional()
+  @IsNumber()
+  borrowerId?: number;
+
+  @IsOptional()
+  @IsNumber()
+  departmentId?: number;
+
+  @IsOptional()
+  @IsNumber()
+  assetId?: number;
+
+  @IsOptional()
+  @IsNumber()
+  handlerId?: number;
+
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  startDate?: Date;
+
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  endDate?: Date;
+
+  @IsOptional()
+  page?: number = 1;
+
+  @IsOptional()
+  pageSize?: number = 20;
+}

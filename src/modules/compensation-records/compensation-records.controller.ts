@@ -13,11 +13,12 @@ import { CompensationRecordsService } from './compensation-records.service';
 import {
   CreateCompensationRecordDto,
   UpdateCompensationRecordDto,
+  QueryCompensationRecordDto,
 } from '../../entities/compensation-record.entity';
 import { Roles, GetCurrentUserId } from '../../common/decorators';
-import { UserRole, CompensationStatus } from '../../common/enums';
+import { UserRole } from '../../common/enums';
 
-@ApiTags('赔偿管理')
+@ApiTags('赔偿记录')
 @ApiBearerAuth()
 @Controller('compensation-records')
 export class CompensationRecordsController {
@@ -37,19 +38,16 @@ export class CompensationRecordsController {
 
   @Get()
   @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
-  @ApiOperation({ summary: '获取赔偿记录列表（管理员）' })
-  findAll(
-    @Query()
-    query: {
-      page?: number;
-      pageSize?: number;
-      status?: CompensationStatus;
-      startDate?: Date;
-      endDate?: Date;
-      handlerId?: number;
-    },
-  ) {
+  @ApiOperation({ summary: '查询赔偿记录列表（管理员）' })
+  findAll(@Query() query: QueryCompensationRecordDto) {
     return this.compensationRecordsService.findAll(query);
+  }
+
+  @Get('statistics')
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: '赔偿对账统计（按员工/部门/资产/状态）' })
+  getStatistics(@Query() query: QueryCompensationRecordDto) {
+    return this.compensationRecordsService.getStatistics(query);
   }
 
   @Get(':id')

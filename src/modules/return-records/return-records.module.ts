@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ReturnRecordsService } from './return-records.service';
 import { ReturnRecordsController } from './return-records.controller';
@@ -12,7 +12,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
   imports: [
     TypeOrmModule.forFeature([ReturnRecord, BorrowRecord, Asset]),
     AuditLogsModule,
-    NotificationsModule,
+    forwardRef(() => NotificationsModule),
   ],
   controllers: [ReturnRecordsController],
   providers: [ReturnRecordsService],

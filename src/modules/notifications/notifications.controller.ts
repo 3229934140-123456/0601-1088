@@ -25,13 +25,28 @@ export class NotificationsController {
     return this.notificationsService.getUnreadCount(userId);
   }
 
+  @Get('unprocessed-count')
+  @ApiOperation({ summary: '获取未处理待办数量（超期+赔偿）' })
+  getUnprocessedCount(@GetCurrentUserId() userId: number) {
+    return this.notificationsService.getUnprocessedCount(userId);
+  }
+
   @Get('unprocessed')
-  @ApiOperation({ summary: '只看未处理事项（超期+赔偿）' })
+  @ApiOperation({ summary: '只看未处理事项（超期+赔偿，自动过滤已解决）' })
   findUnprocessed(
     @GetCurrentUserId() userId: number,
     @Query() query: { page?: number; pageSize?: number },
   ) {
     return this.notificationsService.findUnprocessed(userId, query);
+  }
+
+  @Get('timeline/borrow-record/:borrowRecordId')
+  @ApiOperation({ summary: '按领用单查看完整时间线（申请/审批/领取/超期/归还/赔偿）' })
+  getTimelineByBorrowRecord(
+    @GetCurrentUserId() userId: number,
+    @Param('borrowRecordId') borrowRecordId: string,
+  ) {
+    return this.notificationsService.getTimelineByBorrowRecord(userId, +borrowRecordId);
   }
 
   @Get('entity/:entityType/:entityId')

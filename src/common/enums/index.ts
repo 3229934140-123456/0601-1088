@@ -42,8 +42,18 @@ export enum NotificationType {
   RETURN_REMINDER = 'return_reminder',
   OVERDUE_WARNING = 'overdue_warning',
   COMPENSATION_REQUEST = 'compensation_request',
-  ASSET_FROZEN = 'asset_frozen',
   SYSTEM_NOTICE = 'system_notice',
+}
+
+export enum NotificationTodoStatus {
+  ACTIVE = 'active',
+  RESOLVED = 'resolved',
+  CANCELLED = 'cancelled',
+}
+
+export enum CabinetCallbackAction {
+  CLAIM = 'claim',
+  RETURN = 'return',
 }
 
 export enum AuditAction {
@@ -56,12 +66,15 @@ export enum AuditAction {
   BORROW_APPROVE = 'borrow_approve',
   BORROW_REJECT = 'borrow_reject',
   BORROW_CLAIM = 'borrow_claim',
+  BORROW_CABINET_CLAIM = 'borrow_cabinet_claim',
   RETURN_SUBMIT = 'return_submit',
   RETURN_CONFIRM = 'return_confirm',
+  RETURN_CABINET_RETURN = 'return_cabinet_return',
   DAMAGE_REPORT = 'damage_report',
   COMPENSATION_CREATE = 'compensation_create',
   COMPENSATION_PAY = 'compensation_pay',
   COMPENSATION_WAIVE = 'compensation_waive',
+  CABINET_CALLBACK = 'cabinet_callback',
   USER_CREATE = 'user_create',
   USER_UPDATE = 'user_update',
   USER_DELETE = 'user_delete',

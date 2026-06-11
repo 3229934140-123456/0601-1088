@@ -3,6 +3,8 @@ import {
   NotFoundException,
   ConflictException,
   BadRequestException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -10,6 +12,7 @@ import {
   CompensationRecord,
   CreateCompensationRecordDto,
   UpdateCompensationRecordDto,
+  QueryCompensationRecordDto,
 } from '../../entities/compensation-record.entity';
 import { ReturnRecord } from '../../entities/return-record.entity';
 import { AuditLogService } from '../audit-logs/audit-log.service';
@@ -18,6 +21,7 @@ import {
   AuditAction,
   CompensationStatus,
   NotificationType,
+  NotificationTodoStatus,
 } from '../../common/enums';
 
 @Injectable()
@@ -28,6 +32,7 @@ export class CompensationRecordsService {
     @InjectRepository(ReturnRecord)
     private returnRecordsRepository: Repository<ReturnRecord>,
     private auditLogService: AuditLogService,
+    @Inject(forwardRef(() => NotificationsService))
     private notificationsService: NotificationsService,
   ) {}
 
@@ -94,15 +99,18 @@ export class CompensationRecordsService {
     return this.findOne(saved.id);
   }
 
-  async findAll(params: {
-    page?: number;
-    pageSize?: number;
-    status?: CompensationStatus;
-    startDate?: Date;
-    endDate?: Date;
-    handlerId?: number;
-  }) {
-    const { page = 1, pageSize = 20, status, startDate, endDate, handlerId } = params;
+  async findAll(query: QueryCompensationRecordDto) {
+    const {
+      page = 1,
+      pageSize = 20,
+      status,
+      borrowerId,
+      departmentId,
+      assetId,
+      handlerId,
+      startDate,
+      endDate,
+    } = query;
 
     const qb = this.compensationRecordsRepository
       .createQueryBuilder('compensation')
@@ -110,10 +118,20 @@ export class CompensationRecordsService {
       .leftJoinAndSelect('returnRecord.borrowRecord', 'borrowRecord')
       .leftJoinAndSelect('borrowRecord.asset', 'asset')
       .leftJoinAndSelect('borrowRecord.borrower', 'borrower')
+      .leftJoinAndSelect('borrower.department', 'department')
       .leftJoinAndSelect('compensation.handler', 'handler');
 
     if (status) qb.andWhere('compensation.status = :status', { status });
     if (handlerId) qb.andWhere('compensation.handlerId = :handlerId', { handlerId });
+    if (borrowerId) {
+      qb.andWhere('borrowRecord.borrowerId = :borrowerId', { borrowerId });
+    }
+    if (departmentId) {
+      qb.andWhere('borrower.departmentId = :departmentId', { departmentId });
+    }
+    if (assetId) {
+      qb.andWhere('borrowRecord.assetId = :assetId', { assetId });
+    }
     if (startDate) {
       qb.andWhere('compensation.createdAt >= :startDate', { startDate });
     }
@@ -129,6 +147,44 @@ export class CompensationRecordsService {
       .getMany();
 
     return { list, total, page, pageSize };
+  }
+
+  async getStatistics(query: QueryCompensationRecordDto) {
+    const { status, borrowerId, departmentId, assetId, startDate, endDate } = query;
+
+    const qb = this.compensationRecordsRepository
+      .createQueryBuilder('compensation')
+      .leftJoin('compensation.returnRecord', 'returnRecord')
+      .leftJoin('returnRecord.borrowRecord', 'borrowRecord')
+      .leftJoin('borrowRecord.asset', 'asset')
+      .leftJoin('borrowRecord.borrower', 'borrower')
+      .leftJoin('borrower.department', 'department')
+      .select('COUNT(compensation.id)', 'count')
+      .addSelect('IFNULL(SUM(compensation.amount), 0)', 'totalAmount');
+
+    if (status) qb.andWhere('compensation.status = :status', { status });
+    if (borrowerId) {
+      qb.andWhere('borrowRecord.borrowerId = :borrowerId', { borrowerId });
+    }
+    if (departmentId) {
+      qb.andWhere('borrower.departmentId = :departmentId', { departmentId });
+    }
+    if (assetId) {
+      qb.andWhere('borrowRecord.assetId = :assetId', { assetId });
+    }
+    if (startDate) {
+      qb.andWhere('compensation.createdAt >= :startDate', { startDate });
+    }
+    if (endDate) {
+      qb.andWhere('compensation.createdAt <= :endDate', { endDate });
+    }
+
+    const result = await qb.getRawOne();
+
+    return {
+      count: parseInt(result.count || '0', 10),
+      totalAmount: parseFloat(result.totalAmount || '0'),
+    };
   }
 
   async findOne(id: number): Promise<CompensationRecord> {
@@ -212,10 +268,14 @@ export class CompensationRecordsService {
           relatedData: {
             compensationRecordId: id,
             status: CompensationStatus.PAID,
+            amount: saved.amount,
+            attachments: saved.attachments,
           },
           relatedEntityType: 'CompensationRecord',
           relatedEntityId: id,
         });
+
+        await this.notificationsService.resolveTodoByEntity('CompensationRecord', id);
       }
     } else {
       await this.auditLogService.create({
@@ -265,10 +325,13 @@ export class CompensationRecordsService {
       relatedData: {
         compensationRecordId: id,
         status: CompensationStatus.WAIVED,
+        amount: saved.amount,
       },
       relatedEntityType: 'CompensationRecord',
       relatedEntityId: id,
     });
+
+    await this.notificationsService.resolveTodoByEntity('CompensationRecord', id);
 
     return saved;
   }

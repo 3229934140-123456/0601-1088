@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CompensationRecordsService } from './compensation-records.service';
 import { CompensationRecordsController } from './compensation-records.controller';
@@ -11,7 +11,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
   imports: [
     TypeOrmModule.forFeature([CompensationRecord, ReturnRecord]),
     AuditLogsModule,
-    NotificationsModule,
+    forwardRef(() => NotificationsModule),
   ],
   controllers: [CompensationRecordsController],
   providers: [CompensationRecordsService],

@@ -3,6 +3,8 @@ import {
   NotFoundException,
   ConflictException,
   BadRequestException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -33,6 +35,7 @@ export class ReturnRecordsService {
     @InjectRepository(Asset)
     private assetsRepository: Repository<Asset>,
     private auditLogService: AuditLogService,
+    @Inject(forwardRef(() => NotificationsService))
     private notificationsService: NotificationsService,
   ) {}
 
@@ -217,6 +220,8 @@ export class ReturnRecordsService {
         }
         await this.assetsRepository.save(asset);
       }
+
+      await this.notificationsService.resolveTodoByEntity('BorrowRecord', borrowRecord?.id as number);
 
       await this.auditLogService.create({
         userId: operatorId,

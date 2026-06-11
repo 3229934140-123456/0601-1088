@@ -2,7 +2,7 @@ import { Entity, Column, ManyToOne, Index, JoinColumn } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { BaseEntity } from '../common/entities/base.entity';
 import { User } from './user.entity';
-import { NotificationType } from '../common/enums';
+import { NotificationType, NotificationTodoStatus } from '../common/enums';
 import { IsString, IsOptional, IsEnum, IsNumber } from 'class-validator';
 
 @Entity('notifications')
@@ -12,6 +12,7 @@ import { IsString, IsOptional, IsEnum, IsNumber } from 'class-validator';
 @Index('idx_created_at', ['createdAt'])
 @Index('idx_dedup_key', ['dedupKey'], { unique: true })
 @Index('idx_related_entity', ['relatedEntityType', 'relatedEntityId'])
+@Index('idx_todo_status', ['todoStatus'])
 export class Notification extends BaseEntity {
   @Column({ type: 'bigint', comment: '接收用户ID' })
   @ApiProperty({ description: '接收用户ID' })
@@ -48,6 +49,23 @@ export class Notification extends BaseEntity {
   @Column({ type: 'bigint', nullable: true, comment: '关联实体ID' })
   @ApiProperty({ description: '关联实体ID', required: false })
   relatedEntityId?: number;
+
+  @Column({
+    type: 'enum',
+    enum: NotificationTodoStatus,
+    default: NotificationTodoStatus.ACTIVE,
+    comment: '待办状态',
+  })
+  @ApiProperty({ description: '待办状态', enum: NotificationTodoStatus, default: NotificationTodoStatus.ACTIVE })
+  todoStatus: NotificationTodoStatus;
+
+  @Column({ type: 'datetime', nullable: true, comment: '最近检查时间（用于超期提醒更新）' })
+  @ApiProperty({ description: '最近检查时间', required: false })
+  lastCheckedAt?: Date;
+
+  @Column({ type: 'int', nullable: true, comment: '动态超期天数（用于超期提醒更新）' })
+  @ApiProperty({ description: '动态超期天数', required: false })
+  dynamicOverdueDays?: number;
 
   @Column({ type: 'boolean', default: false, comment: '是否已读' })
   @ApiProperty({ description: '是否已读', default: false })
@@ -98,6 +116,10 @@ export class QueryNotificationDto {
 
   @IsOptional()
   isRead?: boolean;
+
+  @IsOptional()
+  @IsEnum(NotificationTodoStatus)
+  todoStatus?: NotificationTodoStatus;
 
   @IsOptional()
   @IsString()

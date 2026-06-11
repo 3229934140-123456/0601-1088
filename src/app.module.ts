@@ -17,6 +17,7 @@ import { StatisticsModule } from './modules/statistics/statistics.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { ScheduleTasksModule } from './modules/schedule-tasks/schedule-tasks.module';
 import { UploadModule } from './modules/upload/upload.module';
+import { CabinetCallbackModule } from './modules/cabinet-callback/cabinet-callback.module';
 import { DataSourceConfig } from './data-source';
 import { JwtAuthGuard, RolesGuard } from './common/guards';
 
@@ -41,6 +42,7 @@ import { JwtAuthGuard, RolesGuard } from './common/guards';
     NotificationsModule,
     ScheduleTasksModule,
     UploadModule,
+    CabinetCallbackModule,
   ],
   providers: [
     {
