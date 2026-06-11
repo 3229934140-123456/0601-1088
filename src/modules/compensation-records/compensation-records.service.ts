@@ -214,6 +214,9 @@ export class CompensationRecordsService {
         'returnRecord',
         'returnRecord.borrowRecord',
         'returnRecord.borrowRecord.asset',
+        'returnRecord.borrowRecord.asset.category',
+        'returnRecord.borrowRecord.borrower',
+        'returnRecord.borrowRecord.borrower.department',
         'handler',
       ],
     });

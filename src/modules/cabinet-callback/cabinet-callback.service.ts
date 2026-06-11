@@ -20,17 +20,24 @@ import {
 } from '../../common/enums';
 import { AuditLogService } from '../audit-logs/audit-log.service';
 import { BorrowRecordsService } from '../borrow-records/borrow-records.service';
-import { AssetsService } from '../assets/assets.service';
+import { BorrowRecord } from '../../entities/borrow-record.entity';
+import { Asset } from '../../entities/asset.entity';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class CabinetCallbackService {
   constructor(
     @InjectRepository(CabinetCallback)
     private cabinetCallbackRepository: Repository<CabinetCallback>,
+    @InjectRepository(BorrowRecord)
+    private borrowRecordsRepository: Repository<BorrowRecord>,
+    @InjectRepository(Asset)
+    private assetsRepository: Repository<Asset>,
     private auditLogService: AuditLogService,
     @Inject(forwardRef(() => BorrowRecordsService))
     private borrowRecordsService: BorrowRecordsService,
-    private assetsService: AssetsService,
+    @Inject(forwardRef(() => NotificationsService))
+    private notificationsService: NotificationsService,
   ) {}
 
   async handleCallback(dto: CabinetCallbackDto): Promise<{
@@ -110,7 +117,10 @@ export class CabinetCallbackService {
   private async processCallback(dto: CabinetCallbackDto): Promise<void> {
     const { action, borrowRecordId, cabinetCode, lockerNumber, operatorId, operatorName } = dto;
 
-    const borrowRecord = await this.borrowRecordsService.findOne(borrowRecordId);
+    const borrowRecord = await this.borrowRecordsRepository.findOne({
+      where: { id: borrowRecordId },
+      relations: ['asset', 'borrower'],
+    });
     if (!borrowRecord) {
       throw new NotFoundException('领用记录不存在');
     }
@@ -120,6 +130,9 @@ export class CabinetCallbackService {
     const operatorInfo = `操作人: ${operatorName || operatorId} (ID: ${operatorId})`;
 
     if (action === CabinetCallbackAction.CLAIM) {
+      if (borrowRecord.status === BorrowStatus.BORROWED || borrowRecord.status === BorrowStatus.OVERDUE) {
+        return;
+      }
       if (borrowRecord.status !== BorrowStatus.APPROVED) {
         throw new ConflictException('该领用单状态不支持柜机领取');
       }
@@ -139,28 +152,24 @@ export class CabinetCallbackService {
           operatorId,
         },
       });
-
-      await this.auditLogService.create({
-        userId: operatorId,
-        action: AuditAction.CABINET_CALLBACK,
-        description: `柜机回调[领取]: ${assetName} ${cabinetInfo}`,
-        entityType: 'CabinetCallback',
-        entityId: 0,
-        afterData: dto,
-      });
     } else if (action === CabinetCallbackAction.RETURN) {
+      if (borrowRecord.status === BorrowStatus.RETURNED) {
+        return;
+      }
       if (borrowRecord.status !== BorrowStatus.BORROWED && borrowRecord.status !== BorrowStatus.OVERDUE) {
         throw new ConflictException('该领用单状态不支持柜机归还');
       }
 
-      const asset = borrowRecord.asset;
-      if (asset) {
-        asset.status = AssetStatus.AVAILABLE;
-        await this.assetsService.update(asset.id, { status: AssetStatus.AVAILABLE }, operatorId);
-      }
-
       borrowRecord.status = BorrowStatus.RETURNED;
       borrowRecord.actualReturnDate = new Date();
+      await this.borrowRecordsRepository.save(borrowRecord);
+
+      if (borrowRecord.asset) {
+        borrowRecord.asset.status = AssetStatus.AVAILABLE;
+        await this.assetsRepository.save(borrowRecord.asset);
+      }
+
+      await this.notificationsService.resolveTodoByEntity('BorrowRecord', borrowRecordId);
 
       await this.auditLogService.create({
         userId: operatorId,
@@ -173,16 +182,9 @@ export class CabinetCallbackService {
           lockerNumber,
           operatorName,
           operatorId,
+          borrowStatus: BorrowStatus.RETURNED,
+          assetStatus: AssetStatus.AVAILABLE,
         },
-      });
-
-      await this.auditLogService.create({
-        userId: operatorId,
-        action: AuditAction.CABINET_CALLBACK,
-        description: `柜机回调[归还]: ${assetName} ${cabinetInfo}`,
-        entityType: 'CabinetCallback',
-        entityId: 0,
-        afterData: dto,
       });
     } else {
       throw new BadRequestException('不支持的回调动作');
@@ -193,6 +195,7 @@ export class CabinetCallbackService {
     page?: number;
     pageSize?: number;
     cabinetCode?: string;
+    lockerNumber?: string;
     action?: string;
     status?: string;
     borrowRecordId?: number;
@@ -201,16 +204,17 @@ export class CabinetCallbackService {
       page = 1,
       pageSize = 20,
       cabinetCode,
+      lockerNumber,
       action,
       status,
       borrowRecordId,
     } = params;
 
     const qb = this.cabinetCallbackRepository
-      .createQueryBuilder('callback')
-      .leftJoinAndSelect('callback.operator', 'operator');
+      .createQueryBuilder('callback');
 
     if (cabinetCode) qb.andWhere('callback.cabinetCode = :cabinetCode', { cabinetCode });
+    if (lockerNumber) qb.andWhere('callback.lockerNumber = :lockerNumber', { lockerNumber });
     if (action) qb.andWhere('callback.action = :action', { action });
     if (status) qb.andWhere('callback.status = :status', { status });
     if (borrowRecordId) qb.andWhere('callback.borrowRecordId = :borrowRecordId', { borrowRecordId });
@@ -228,7 +232,6 @@ export class CabinetCallbackService {
   async findOne(id: number): Promise<CabinetCallback> {
     const callback = await this.cabinetCallbackRepository.findOne({
       where: { id },
-      relations: ['operator'],
     });
     if (!callback) {
       throw new NotFoundException('回调记录不存在');

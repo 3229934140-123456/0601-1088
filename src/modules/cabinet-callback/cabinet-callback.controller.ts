@@ -28,6 +28,7 @@ export class CabinetCallbackController {
       page?: number;
       pageSize?: number;
       cabinetCode?: string;
+      lockerNumber?: string;
       action?: string;
       status?: string;
       borrowRecordId?: string;

@@ -159,25 +159,51 @@ export class NotificationsService {
   }
 
   async getTimelineByBorrowRecord(userId: number, borrowRecordId: number) {
-    const qb = this.notificationsRepository
-      .createQueryBuilder('notification')
-      .where('notification.userId = :userId', { userId })
-      .andWhere(
-        '(notification.relatedEntityType = :borrowType AND notification.relatedEntityId = :borrowId) OR (notification.relatedEntityType = :returnType AND EXISTS (SELECT 1 FROM return_record rr WHERE rr.id = notification.relatedEntityId AND rr.borrowRecordId = :borrowId)) OR (notification.relatedEntityType = :compType AND EXISTS (SELECT 1 FROM compensation_record cr JOIN return_record rr ON cr.returnRecordId = rr.id WHERE cr.id = notification.relatedEntityId AND rr.borrowRecordId = :borrowId))',
-        {
-          userId,
-          borrowType: 'BorrowRecord',
-          borrowId: borrowRecordId,
-          returnType: 'ReturnRecord',
-          compType: 'CompensationRecord',
-        },
-      )
-      .orderBy('notification.createdAt', 'ASC');
+    const borrowNotifications = await this.notificationsRepository.find({
+      where: { userId, relatedEntityType: 'BorrowRecord', relatedEntityId: borrowRecordId },
+      order: { createdAt: 'ASC' },
+    });
 
-    const list = await qb.getMany();
-    const enrichedList = await Promise.all(list.map((n) => this.enrichNotification(n)));
+    const returnRecordIds = (await this.notificationsRepository.manager
+      .createQueryBuilder()
+      .select('rr.id', 'id')
+      .from('return_record', 'rr')
+      .where('rr.borrowRecordId = :borrowRecordId', { borrowRecordId })
+      .getRawMany()).map((r) => r.id);
 
-    return list.map((n) => ({
+    const returnNotifications: Notification[] = [];
+    const compNotifications: Notification[] = [];
+
+    for (const rrId of returnRecordIds) {
+      const rNotifs = await this.notificationsRepository.find({
+        where: { userId, relatedEntityType: 'ReturnRecord', relatedEntityId: rrId },
+      });
+      returnNotifications.push(...rNotifs);
+
+      const compIds = (await this.notificationsRepository.manager
+        .createQueryBuilder()
+        .select('cr.id', 'id')
+        .from('compensation_record', 'cr')
+        .where('cr.returnRecordId = :rrId', { rrId })
+        .getRawMany()).map((c) => c.id);
+
+      for (const crId of compIds) {
+        const cNotifs = await this.notificationsRepository.find({
+          where: { userId, relatedEntityType: 'CompensationRecord', relatedEntityId: crId },
+        });
+        compNotifications.push(...cNotifs);
+      }
+    }
+
+    const allNotifications = [
+      ...borrowNotifications,
+      ...returnNotifications,
+      ...compNotifications,
+    ].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+
+    const enrichedList = await Promise.all(allNotifications.map((n) => this.enrichNotification(n)));
+
+    return enrichedList.map((n) => ({
       ...n,
       timelineKey: `${n.createdAt.getTime()}_${n.type}`,
     }));
